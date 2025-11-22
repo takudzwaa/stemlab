@@ -4,18 +4,13 @@ export interface Component {
     category: 'sensor' | 'microcontroller' | 'actuator' | 'other';
     totalQuantity: number;
     availableQuantity: number;
-export interface Component {
-    id: string;
-    name: string;
-    category: 'sensor' | 'microcontroller' | 'actuator' | 'other';
-    totalQuantity: number;
-    availableQuantity: number;
     description: string;
 }
 
 export interface LabBooking {
     id: string;
     userId: string;
+    userName?: string;
     date: string;
     startTime: string;
     endTime: string;
@@ -24,4 +19,5 @@ export interface LabBooking {
     topic?: string;
     numberOfStudents?: number;
     requirements?: string;
+    purpose?: string;
 }
