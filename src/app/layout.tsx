@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from '@/components/Navbar';
+import { CartProvider } from '@/context/CartContext';
 
 export const metadata: Metadata = {
   title: 'CUT Online Booking',
@@ -16,7 +17,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Navbar />
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
       </body>
     </html>
   );

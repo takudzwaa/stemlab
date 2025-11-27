@@ -1,21 +1,15 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { AuthService } from '@/services/auth';
-import { InventoryService, ComponentOrder } from '@/services/inventory';
-import { User } from '@/types/user';
-import { Component } from '@/types/inventory';
 import { Button, Input, Card } from '@/components/UI';
+import { useCart } from '@/context/CartContext';
 
 export default function StudentDashboard() {
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [components, setComponents] = useState<Component[]>([]);
-    const [cart, setCart] = useState<{ component: Component; quantity: number }[]>([]);
     const [myOrders, setMyOrders] = useState<ComponentOrder[]>([]);
+
+    // Use global cart context
+    const { cart, addToCart, removeFromCart, clearCart } = useCart();
 
     useEffect(() => {
         const currentUser = AuthService.getCurrentUser();
@@ -38,25 +32,6 @@ export default function StudentDashboard() {
         setComponents(InventoryService.searchComponents(e.target.value));
     };
 
-    const addToCart = (component: Component) => {
-        const existing = cart.find(item => item.component.id === component.id);
-        if (existing) {
-            if (existing.quantity < component.availableQuantity) {
-                setCart(cart.map(item =>
-                    item.component.id === component.id ? { ...item, quantity: item.quantity + 1 } : item
-                ));
-            } else {
-                alert('Max quantity reached');
-            }
-        } else {
-            setCart([...cart, { component, quantity: 1 }]);
-        }
-    };
-
-    const removeFromCart = (componentId: string) => {
-        setCart(cart.filter(item => item.component.id !== componentId));
-    };
-
     const submitOrder = () => {
         if (!user || cart.length === 0) return;
 
@@ -70,7 +45,7 @@ export default function StudentDashboard() {
             }))
         });
 
-        setCart([]);
+        clearCart();
         loadOrders(user.id);
         alert('Order submitted successfully!');
     };
@@ -120,7 +95,7 @@ export default function StudentDashboard() {
                                         style={{ marginTop: '1rem', width: '100%' }}
                                         variant="secondary"
                                     >
-                                        {component.availableQuantity === 0 ? 'Out of Stock' : 'Add to Order'}
+                                        {component.availableQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
                                     </Button>
                                 </div>
                             ))}
@@ -130,9 +105,9 @@ export default function StudentDashboard() {
 
                 {/* Right Column: Cart & Orders */}
                 <div className="flex flex-col gap-4">
-                    <Card title="Current Order">
+                    <Card title="Current Cart">
                         {cart.length === 0 ? (
-                            <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: '1rem' }}>Your order list is empty.</p>
+                            <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: '1rem' }}>Your cart is empty.</p>
                         ) : (
                             <>
                                 <div className="flex flex-col gap-2 mb-4">

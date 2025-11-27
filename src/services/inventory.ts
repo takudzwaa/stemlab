@@ -98,5 +98,52 @@ export const InventoryService = {
             pending: bookings.filter(b => b.status === 'pending').length,
             rejected: bookings.filter(b => b.status === 'rejected').length
         };
+    },
+
+    approveBooking: (bookingId: string) => {
+        const bookings = InventoryService.getBookings();
+        const bookingIndex = bookings.findIndex(b => b.id === bookingId);
+
+        if (bookingIndex === -1) return false;
+
+        const booking = bookings[bookingIndex];
+
+        // If booking has components, deduct them from inventory
+        if (booking.components && booking.components.length > 0) {
+            const components = InventoryService.getComponents();
+
+            // Check if enough quantity exists for all items
+            for (const item of booking.components) {
+                const component = components.find(c => c.id === item.componentId);
+                if (!component || component.availableQuantity < item.quantity) {
+                    return false; // Cannot approve if insufficient stock
+                }
+            }
+
+            // Deduct quantities
+            for (const item of booking.components) {
+                const componentIndex = components.findIndex(c => c.id === item.componentId);
+                if (componentIndex !== -1) {
+                    components[componentIndex].availableQuantity -= item.quantity;
+                }
+            }
+
+            localStorage.setItem(COMPONENT_STORAGE_KEY, JSON.stringify(components));
+        }
+
+        bookings[bookingIndex].status = 'approved';
+        localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(bookings));
+        return true;
+    },
+
+    rejectBooking: (bookingId: string) => {
+        const bookings = InventoryService.getBookings();
+        const bookingIndex = bookings.findIndex(b => b.id === bookingId);
+        if (bookingIndex !== -1) {
+            bookings[bookingIndex].status = 'rejected';
+            localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(bookings));
+            return true;
+        }
+        return false;
     }
 };

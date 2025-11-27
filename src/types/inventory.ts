@@ -20,4 +20,5 @@ export interface LabBooking {
     numberOfStudents?: number;
     requirements?: string;
     purpose?: string;
+    components?: { componentId: string; componentName: string; quantity: number }[];
 }

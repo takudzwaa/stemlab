@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '@/services/auth';
 import { InventoryService } from '@/services/inventory';
 import { User } from '@/types/user';
 import { Button, Input, Card } from '@/components/UI';
+import { useCart } from '@/context/CartContext';
 
 export default function BookLabPage() {
     const router = useRouter();
@@ -17,6 +18,9 @@ export default function BookLabPage() {
         purpose: ''
     });
     const [isLoading, setIsLoading] = useState(false);
+
+    // Use global cart context
+    const { cart, clearCart } = useCart();
 
     useEffect(() => {
         const currentUser = AuthService.getCurrentUser();
@@ -37,8 +41,15 @@ export default function BookLabPage() {
             InventoryService.createBooking({
                 userId: user.id,
                 userName: user.name,
-                ...formData
+                ...formData,
+                components: cart.map(item => ({
+                    componentId: item.component.id,
+                    componentName: item.component.name,
+                    quantity: item.quantity
+                }))
             });
+
+            clearCart();
             alert('Booking request submitted successfully!');
             router.push('/student');
         } catch (err) {
@@ -96,6 +107,20 @@ export default function BookLabPage() {
                             }}
                         />
                     </div>
+
+                    {/* Show Cart Items attached to booking */}
+                    {cart.length > 0 && (
+                        <div style={{ padding: '1rem', backgroundColor: 'var(--color-surface-alt)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+                            <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Components to Reserve:</h4>
+                            <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem' }}>
+                                {cart.map(item => (
+                                    <li key={item.component.id}>
+                                        {item.component.name} (x{item.quantity})
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <div className="flex gap-4" style={{ marginTop: '1rem' }}>
                         <Button type="button" variant="secondary" onClick={() => router.back()} style={{ flex: 1 }}>
