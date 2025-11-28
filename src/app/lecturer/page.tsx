@@ -26,38 +26,43 @@ export default function LecturerDashboard() {
     const { cart, addToCart, removeFromCart, clearCart } = useCart();
 
     useEffect(() => {
-        const currentUser = AuthService.getCurrentUser();
-        if (!currentUser || currentUser.role !== 'lecturer') {
-            router.push('/login');
-            return;
-        }
-        setUser(currentUser);
-        setComponents(InventoryService.getComponents());
-        loadOrders(currentUser.id);
-        loadStudentBookings();
+        const init = async () => {
+            const currentUser = AuthService.getCurrentUser();
+            if (!currentUser || currentUser.role !== 'lecturer') {
+                router.push('/login');
+                return;
+            }
+            setUser(currentUser);
+            const comps = await InventoryService.getComponents();
+            setComponents(comps);
+            await loadOrders(currentUser.id);
+            await loadStudentBookings();
+        };
+        init();
     }, []);
 
-    const loadOrders = (userId: string) => {
-        const allOrders = InventoryService.getOrders();
+    const loadOrders = async (userId: string) => {
+        const allOrders = await InventoryService.getOrders();
         setMyOrders(allOrders.filter(o => o.userId === userId));
     };
 
-    const loadStudentBookings = () => {
-        const bookings = InventoryService.getBookings();
+    const loadStudentBookings = async () => {
+        const bookings = await InventoryService.getBookings();
         // Filter for bookings that might be relevant to this lecturer (e.g., same course)
         // For now, showing all pending bookings for simplicity or all bookings
         setStudentBookings(bookings);
     };
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(e.target.value);
-        setComponents(InventoryService.searchComponents(e.target.value));
+        const results = await InventoryService.searchComponents(e.target.value);
+        setComponents(results);
     };
 
-    const submitOrder = () => {
+    const submitOrder = async () => {
         if (!user || cart.length === 0) return;
 
-        InventoryService.createOrder({
+        await InventoryService.createOrder({
             userId: user.id,
             userName: user.name,
             items: cart.map(item => ({
@@ -68,15 +73,15 @@ export default function LecturerDashboard() {
         });
 
         clearCart();
-        loadOrders(user.id);
+        await loadOrders(user.id);
         alert('Order submitted successfully!');
     };
 
-    const handleApproveBooking = (bookingId: string) => {
-        const success = InventoryService.approveBooking(bookingId);
+    const handleApproveBooking = async (bookingId: string) => {
+        const success = await InventoryService.approveBooking(bookingId);
         if (success) {
             alert('Booking approved successfully');
-            loadStudentBookings();
+            await loadStudentBookings();
         } else {
             alert('Failed to approve booking. Check inventory availability.');
         }

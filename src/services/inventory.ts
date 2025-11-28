@@ -1,4 +1,15 @@
 import { Component, LabBooking } from '@/types/inventory';
+import { db } from '@/lib/firebase';
+import {
+    collection,
+    getDocs,
+    addDoc,
+    updateDoc,
+    doc,
+    query,
+    where,
+    runTransaction
+} from 'firebase/firestore';
 
 export interface ComponentOrder {
     id: string;
@@ -9,141 +20,196 @@ export interface ComponentOrder {
     date: string;
 }
 
-const MOCK_COMPONENTS: Component[] = [
-    { id: '1', name: 'Arduino Uno', category: 'microcontroller', totalQuantity: 20, availableQuantity: 15, description: 'Standard microcontroller board' },
-    { id: '2', name: 'Raspberry Pi 4', category: 'microcontroller', totalQuantity: 10, availableQuantity: 2, description: 'Single-board computer' },
-    { id: '3', name: 'Ultrasonic Sensor (HC-SR04)', category: 'sensor', totalQuantity: 50, availableQuantity: 48, description: 'Distance measuring sensor' },
-    { id: '4', name: 'Servo Motor (SG90)', category: 'actuator', totalQuantity: 30, availableQuantity: 0, description: 'Micro servo motor' },
-    { id: '5', name: 'DHT11', category: 'sensor', totalQuantity: 40, availableQuantity: 35, description: 'Temperature and humidity sensor' },
-];
-
-const COMPONENT_STORAGE_KEY = 'stemlab_components';
-const BOOKING_STORAGE_KEY = 'stemlab_bookings';
-const ORDER_STORAGE_KEY = 'stemlab_orders';
-
 export const InventoryService = {
-    getComponents: (): Component[] => {
-        if (typeof window === 'undefined') return MOCK_COMPONENTS;
-        const stored = localStorage.getItem(COMPONENT_STORAGE_KEY);
-        if (!stored) {
-            localStorage.setItem(COMPONENT_STORAGE_KEY, JSON.stringify(MOCK_COMPONENTS));
-            return MOCK_COMPONENTS;
+    getComponents: async (): Promise<Component[]> => {
+        try {
+            const querySnapshot = await getDocs(collection(db, 'components'));
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Component));
+        } catch (error) {
+            console.error("Error fetching components:", error);
+            return [];
         }
-        return JSON.parse(stored);
     },
 
-    searchComponents: (query: string): Component[] => {
-        const components = InventoryService.getComponents();
-        if (!query) return components;
-        const lowerQuery = query.toLowerCase();
+    searchComponents: async (queryText: string): Promise<Component[]> => {
+        const components = await InventoryService.getComponents();
+        if (!queryText) return components;
+        const lowerQuery = queryText.toLowerCase();
         return components.filter(c =>
             c.name.toLowerCase().includes(lowerQuery) ||
             c.category.toLowerCase().includes(lowerQuery)
         );
     },
 
-    getBookings: (): LabBooking[] => {
-        if (typeof window === 'undefined') return [];
-        const stored = localStorage.getItem(BOOKING_STORAGE_KEY);
-        return stored ? JSON.parse(stored) : [];
-    },
-
-    createBooking: (booking: Omit<LabBooking, 'id' | 'status'>): LabBooking => {
-        const bookings = InventoryService.getBookings();
-        const newBooking: LabBooking = {
-            ...booking,
-            id: Math.random().toString(36).substr(2, 9),
-            status: 'pending'
-        };
-        bookings.push(newBooking);
-        localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(bookings));
-        return newBooking;
-    },
-
-    addComponent: (component: Omit<Component, 'id'>): Component => {
-        const components = InventoryService.getComponents();
-        const newComponent: Component = {
-            ...component,
-            id: Math.random().toString(36).substr(2, 9)
-        };
-        components.push(newComponent);
-        localStorage.setItem(COMPONENT_STORAGE_KEY, JSON.stringify(components));
-        return newComponent;
-    },
-
-    getOrders: (): ComponentOrder[] => {
-        if (typeof window === 'undefined') return [];
-        const stored = localStorage.getItem(ORDER_STORAGE_KEY);
-        return stored ? JSON.parse(stored) : [];
-    },
-
-    createOrder: (order: Omit<ComponentOrder, 'id' | 'status' | 'date'>): ComponentOrder => {
-        const orders = InventoryService.getOrders();
-        const newOrder: ComponentOrder = {
-            ...order,
-            id: Math.random().toString(36).substr(2, 9),
-            status: 'pending',
-            date: new Date().toISOString()
-        };
-        orders.push(newOrder);
-        localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
-        return newOrder;
-    },
-
-    getBookingStats: (userId: string) => {
-        const bookings = InventoryService.getBookings().filter(b => b.userId === userId);
-        return {
-            total: bookings.length,
-            approved: bookings.filter(b => b.status === 'approved').length,
-            pending: bookings.filter(b => b.status === 'pending').length,
-            rejected: bookings.filter(b => b.status === 'rejected').length
-        };
-    },
-
-    approveBooking: (bookingId: string) => {
-        const bookings = InventoryService.getBookings();
-        const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-
-        if (bookingIndex === -1) return false;
-
-        const booking = bookings[bookingIndex];
-
-        // If booking has components, deduct them from inventory
-        if (booking.components && booking.components.length > 0) {
-            const components = InventoryService.getComponents();
-
-            // Check if enough quantity exists for all items
-            for (const item of booking.components) {
-                const component = components.find(c => c.id === item.componentId);
-                if (!component || component.availableQuantity < item.quantity) {
-                    return false; // Cannot approve if insufficient stock
-                }
-            }
-
-            // Deduct quantities
-            for (const item of booking.components) {
-                const componentIndex = components.findIndex(c => c.id === item.componentId);
-                if (componentIndex !== -1) {
-                    components[componentIndex].availableQuantity -= item.quantity;
-                }
-            }
-
-            localStorage.setItem(COMPONENT_STORAGE_KEY, JSON.stringify(components));
+    getBookings: async (): Promise<LabBooking[]> => {
+        try {
+            const querySnapshot = await getDocs(collection(db, 'bookings'));
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LabBooking));
+        } catch (error) {
+            console.error("Error fetching bookings:", error);
+            return [];
         }
-
-        bookings[bookingIndex].status = 'approved';
-        localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(bookings));
-        return true;
     },
 
-    rejectBooking: (bookingId: string) => {
-        const bookings = InventoryService.getBookings();
-        const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-        if (bookingIndex !== -1) {
-            bookings[bookingIndex].status = 'rejected';
-            localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify(bookings));
+    createBooking: async (booking: Omit<LabBooking, 'id' | 'status'>): Promise<LabBooking> => {
+        try {
+            const newBookingData = {
+                ...booking,
+                status: 'pending'
+            };
+            const docRef = await addDoc(collection(db, 'bookings'), newBookingData);
+            return { id: docRef.id, ...newBookingData } as LabBooking;
+        } catch (error) {
+            console.error("Error creating booking:", error);
+            throw error;
+        }
+    },
+
+    addComponent: async (component: Omit<Component, 'id'>): Promise<Component> => {
+        try {
+            const docRef = await addDoc(collection(db, 'components'), component);
+            return { id: docRef.id, ...component } as Component;
+        } catch (error) {
+            console.error("Error adding component:", error);
+            throw error;
+        }
+    },
+
+    getOrders: async (): Promise<ComponentOrder[]> => {
+        try {
+            const querySnapshot = await getDocs(collection(db, 'orders'));
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ComponentOrder));
+        } catch (error) {
+            console.error("Error fetching orders:", error);
+            return [];
+        }
+    },
+
+    createOrder: async (order: Omit<ComponentOrder, 'id' | 'status' | 'date'>): Promise<ComponentOrder> => {
+        try {
+            const newOrderData = {
+                ...order,
+                status: 'pending',
+                date: new Date().toISOString()
+            };
+            const docRef = await addDoc(collection(db, 'orders'), newOrderData);
+            return { id: docRef.id, ...newOrderData } as ComponentOrder;
+        } catch (error) {
+            console.error("Error creating order:", error);
+            throw error;
+        }
+    },
+
+    getBookingStats: async (userId: string) => {
+        try {
+            const q = query(collection(db, 'bookings'), where('userId', '==', userId));
+            const querySnapshot = await getDocs(q);
+            const bookings = querySnapshot.docs.map(doc => doc.data() as LabBooking);
+
+            return {
+                total: bookings.length,
+                approved: bookings.filter(b => b.status === 'approved').length,
+                pending: bookings.filter(b => b.status === 'pending').length,
+                rejected: bookings.filter(b => b.status === 'rejected').length
+            };
+        } catch (error) {
+            console.error("Error getting stats:", error);
+            return { total: 0, approved: 0, pending: 0, rejected: 0 };
+        }
+    },
+
+    approveBooking: async (bookingId: string): Promise<boolean> => {
+        try {
+            await runTransaction(db, async (transaction) => {
+                const bookingRef = doc(db, 'bookings', bookingId);
+                const bookingDoc = await transaction.get(bookingRef);
+
+                if (!bookingDoc.exists()) {
+                    throw new Error("Booking does not exist!");
+                }
+
+                const booking = bookingDoc.data() as LabBooking;
+
+                if (booking.components && booking.components.length > 0) {
+                    // Check availability and deduct
+                    for (const item of booking.components) {
+                        const componentRef = doc(db, 'components', item.componentId);
+                        const componentDoc = await transaction.get(componentRef);
+
+                        if (!componentDoc.exists()) {
+                            throw new Error(`Component ${item.componentId} not found`);
+                        }
+
+                        const component = componentDoc.data() as Component;
+                        if (component.availableQuantity < item.quantity) {
+                            throw new Error(`Insufficient quantity for ${component.name}`);
+                        }
+
+                        transaction.update(componentRef, {
+                            availableQuantity: component.availableQuantity - item.quantity
+                        });
+                    }
+                }
+
+                transaction.update(bookingRef, { status: 'approved' });
+            });
             return true;
+        } catch (error) {
+            console.error("Transaction failed: ", error);
+            return false;
         }
-        return false;
+    },
+
+    rejectBooking: async (bookingId: string): Promise<boolean> => {
+        try {
+            const bookingRef = doc(db, 'bookings', bookingId);
+            await updateDoc(bookingRef, { status: 'rejected' });
+            return true;
+        } catch (error) {
+            console.error("Error rejecting booking:", error);
+            return false;
+        }
+    },
+
+    updateOrderStatus: async (orderId: string, status: 'approved' | 'rejected'): Promise<boolean> => {
+        try {
+            await runTransaction(db, async (transaction) => {
+                const orderRef = doc(db, 'orders', orderId);
+                const orderDoc = await transaction.get(orderRef);
+
+                if (!orderDoc.exists()) {
+                    throw new Error("Order does not exist!");
+                }
+
+                const order = orderDoc.data() as ComponentOrder;
+
+                if (status === 'approved' && order.status !== 'approved') {
+                    // Deduct inventory
+                    for (const item of order.items) {
+                        const componentRef = doc(db, 'components', item.componentId);
+                        const componentDoc = await transaction.get(componentRef);
+
+                        if (!componentDoc.exists()) {
+                            throw new Error(`Component ${item.componentId} not found`);
+                        }
+
+                        const component = componentDoc.data() as Component;
+                        if (component.availableQuantity < item.quantity) {
+                            throw new Error(`Insufficient quantity for ${component.name}`);
+                        }
+
+                        transaction.update(componentRef, {
+                            availableQuantity: component.availableQuantity - item.quantity
+                        });
+                    }
+                }
+
+                transaction.update(orderRef, { status });
+            });
+            return true;
+        } catch (error) {
+            console.error("Error updating order status:", error);
+            return false;
+        }
     }
 };

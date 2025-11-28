@@ -16,7 +16,7 @@ export default function RegisterPage() {
         confirmPassword: ''
     });
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         if (formData.password !== formData.confirmPassword) {
             alert("Passwords don't match");
@@ -24,15 +24,25 @@ export default function RegisterPage() {
         }
 
         const role = activeTab === 'student' ? 'student' : 'lecturer'; // Default staff to lecturer for now
-        AuthService.register({
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            role: role
-        });
 
-        alert('Registration successful! Please wait for admin approval.');
-        router.push('/login');
+        try {
+            await AuthService.register({
+                name: formData.name,
+                email: formData.email,
+                password: formData.password,
+                role: role
+            });
+
+            alert('Registration successful! Please wait for admin approval.');
+            router.push('/login');
+        } catch (err: any) {
+            console.error("Registration error:", err);
+            if (err.code === 'auth/email-already-in-use') {
+                alert('Email is already registered. Please login.');
+            } else {
+                alert('Registration failed: ' + (err.message || 'Unknown error'));
+            }
+        }
     };
 
     return (

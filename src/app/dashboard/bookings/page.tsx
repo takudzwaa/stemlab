@@ -11,15 +11,18 @@ export default function BookingsPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const user = AuthService.getCurrentUser();
-        if (user) {
-            const allBookings = InventoryService.getBookings();
-            const userBookings = allBookings
-                .filter(b => b.userId === user.id)
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            setBookings(userBookings);
-        }
-        setLoading(false);
+        const init = async () => {
+            const user = AuthService.getCurrentUser();
+            if (user) {
+                const allBookings = await InventoryService.getBookings();
+                const userBookings = allBookings
+                    .filter(b => b.userId === user.id)
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setBookings(userBookings);
+            }
+            setLoading(false);
+        };
+        init();
     }, []);
 
     if (loading) return <div>Loading bookings...</div>;

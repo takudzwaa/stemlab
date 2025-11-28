@@ -1,3 +1,12 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { AuthService } from '@/services/auth';
+import { InventoryService, ComponentOrder } from '@/services/inventory';
+import { User } from '@/types/user';
+import { Component } from '@/types/inventory';
 import { Button, Input, Card } from '@/components/UI';
 import { useCart } from '@/context/CartContext';
 
@@ -12,30 +21,35 @@ export default function StudentDashboard() {
     const { cart, addToCart, removeFromCart, clearCart } = useCart();
 
     useEffect(() => {
-        const currentUser = AuthService.getCurrentUser();
-        if (!currentUser || currentUser.role !== 'student') {
-            router.push('/login');
-            return;
-        }
-        setUser(currentUser);
-        setComponents(InventoryService.getComponents());
-        loadOrders(currentUser.id);
+        const init = async () => {
+            const currentUser = AuthService.getCurrentUser();
+            if (!currentUser || currentUser.role !== 'student') {
+                router.push('/login');
+                return;
+            }
+            setUser(currentUser);
+            const comps = await InventoryService.getComponents();
+            setComponents(comps);
+            await loadOrders(currentUser.id);
+        };
+        init();
     }, []);
 
-    const loadOrders = (userId: string) => {
-        const allOrders = InventoryService.getOrders();
+    const loadOrders = async (userId: string) => {
+        const allOrders = await InventoryService.getOrders();
         setMyOrders(allOrders.filter(o => o.userId === userId));
     };
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(e.target.value);
-        setComponents(InventoryService.searchComponents(e.target.value));
+        const results = await InventoryService.searchComponents(e.target.value);
+        setComponents(results);
     };
 
-    const submitOrder = () => {
+    const submitOrder = async () => {
         if (!user || cart.length === 0) return;
 
-        InventoryService.createOrder({
+        await InventoryService.createOrder({
             userId: user.id,
             userName: user.name,
             items: cart.map(item => ({
@@ -46,7 +60,7 @@ export default function StudentDashboard() {
         });
 
         clearCart();
-        loadOrders(user.id);
+        await loadOrders(user.id);
         alert('Order submitted successfully!');
     };
 

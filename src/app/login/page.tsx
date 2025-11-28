@@ -13,11 +13,11 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         try {
-            const user = AuthService.login(email, password);
+            const user = await AuthService.login(email, password);
             if (user) {
                 if (activeTab === 'student' && user.role !== 'student') {
                     setError('Invalid student credentials');
@@ -34,7 +34,14 @@ export default function LoginPage() {
                 setError('Invalid credentials');
             }
         } catch (err: any) {
-            setError(err.message);
+            console.error("Login error:", err);
+            if (err.message === 'Account pending approval') {
+                setError('Your account is waiting for admin approval. Please contact the administrator.');
+            } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                setError('Invalid email or password. Please check your credentials or register if you are new.');
+            } else {
+                setError(err.message || 'Failed to login');
+            }
         }
     };
 

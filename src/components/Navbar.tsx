@@ -37,7 +37,12 @@ export default function Navbar() {
                 alignItems: 'center',
                 justifyContent: 'space-between'
             }}>
-                <Link href="/" style={{
+                <Link href={
+                    !user ? '/' :
+                        user.role === 'admin' ? '/admin' :
+                            user.role === 'student' ? '/student' :
+                                user.role === 'lecturer' ? '/lecturer' : '/'
+                } style={{
                     fontSize: '1.25rem',
                     fontWeight: 'bold',
                     color: 'var(--color-primary)',

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '@/services/auth';
-import { InventoryService } from '@/services/inventory';
+import { InventoryService, ComponentOrder } from '@/services/inventory';
 import { User, UserRole } from '@/types/user';
 import { LabBooking, Component } from '@/types/inventory';
 import { Button, Card, Input } from '@/components/UI';
@@ -12,8 +12,10 @@ export default function AdminDashboard() {
     const router = useRouter();
     const [users, setUsers] = useState<User[]>([]);
     const [bookings, setBookings] = useState<LabBooking[]>([]);
+    const [orders, setOrders] = useState<ComponentOrder[]>([]);
+    const [components, setComponents] = useState<Component[]>([]);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [activeTab, setActiveTab] = useState<'users' | 'bookings' | 'logs'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'bookings' | 'orders' | 'inventory' | 'logs'>('users');
 
     // Modal states
     const [showAddResource, setShowAddResource] = useState(false);
@@ -34,6 +36,9 @@ export default function AdminDashboard() {
         role: 'student' as UserRole
     });
 
+    // Inventory Filter State
+    const [inventoryFilter, setInventoryFilter] = useState<'all' | 'sensor' | 'microcontroller' | 'actuator' | 'other'>('all');
+
     useEffect(() => {
         const user = AuthService.getCurrentUser();
         if (!user || user.role !== 'admin') {
@@ -44,25 +49,32 @@ export default function AdminDashboard() {
         loadData();
     }, []);
 
-    const loadData = () => {
-        setUsers(AuthService.getUsers());
-        setBookings(InventoryService.getBookings());
+    const loadData = async () => {
+        const fetchedUsers = await AuthService.getUsers();
+        setUsers(fetchedUsers);
+        const fetchedBookings = await InventoryService.getBookings();
+        setBookings(fetchedBookings);
+        const fetchedOrders = await InventoryService.getOrders();
+        setOrders(fetchedOrders);
+        const fetchedComponents = await InventoryService.getComponents();
+        setComponents(fetchedComponents);
     };
 
-    const handleApprove = (userId: string) => {
-        AuthService.approveUser(userId);
+    const handleApprove = async (userId: string) => {
+        await AuthService.approveUser(userId);
         loadData();
     };
 
-    const handleAddResource = (e: React.FormEvent) => {
+    const handleAddResource = async (e: React.FormEvent) => {
         e.preventDefault();
-        InventoryService.addComponent({
+        await InventoryService.addComponent({
             ...resourceForm,
             availableQuantity: resourceForm.totalQuantity // Default available to total
         });
         setShowAddResource(false);
         setResourceForm({ name: '', category: 'other', totalQuantity: 0, availableQuantity: 0, description: '' });
         alert('Resource added successfully');
+        loadData();
     };
 
     const startEditUser = (user: User) => {
@@ -70,17 +82,17 @@ export default function AdminDashboard() {
         setEditUserForm({ name: user.name, email: user.email, role: user.role });
     };
 
-    const handleUpdateUser = (e: React.FormEvent) => {
+    const handleUpdateUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingUser) return;
-        AuthService.updateUser(editingUser.id, editUserForm);
+        await AuthService.updateUser(editingUser.id, editUserForm);
         setEditingUser(null);
         loadData();
         alert('User updated successfully');
     };
 
-    const handleApproveBooking = (bookingId: string) => {
-        const success = InventoryService.approveBooking(bookingId);
+    const handleApproveBooking = async (bookingId: string) => {
+        const success = await InventoryService.approveBooking(bookingId);
         if (success) {
             alert('Booking approved successfully');
             loadData();
@@ -89,10 +101,28 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleRejectBooking = (bookingId: string) => {
-        const success = InventoryService.rejectBooking(bookingId);
+    const handleRejectBooking = async (bookingId: string) => {
+        const success = await InventoryService.rejectBooking(bookingId);
         if (success) {
             alert('Booking rejected');
+            loadData();
+        }
+    };
+
+    const handleApproveOrder = async (orderId: string) => {
+        const success = await InventoryService.updateOrderStatus(orderId, 'approved');
+        if (success) {
+            alert('Order approved successfully');
+            loadData();
+        } else {
+            alert('Failed to approve order. Check inventory availability.');
+        }
+    };
+
+    const handleRejectOrder = async (orderId: string) => {
+        const success = await InventoryService.updateOrderStatus(orderId, 'rejected');
+        if (success) {
+            alert('Order rejected');
             loadData();
         }
     };
@@ -100,6 +130,12 @@ export default function AdminDashboard() {
     const pendingUsers = users.filter(u => !u.isApproved);
     const pendingBookings = bookings.filter(b => b.status === 'pending');
     const approvedBookings = bookings.filter(b => b.status === 'approved');
+    const pendingOrders = orders.filter(o => o.status === 'pending');
+    const pastOrders = orders.filter(o => o.status !== 'pending');
+
+    const filteredComponents = inventoryFilter === 'all'
+        ? components
+        : components.filter(c => c.category === inventoryFilter);
 
     if (!currentUser) return null;
 
@@ -110,50 +146,31 @@ export default function AdminDashboard() {
                 <Button onClick={() => setShowAddResource(true)}>Add New Resource</Button>
             </div>
 
-            <div style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-                <div className="flex gap-4">
-                    <button
-                        onClick={() => setActiveTab('users')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderBottom: activeTab === 'users' ? '2px solid var(--color-primary)' : 'none',
-                            color: activeTab === 'users' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                            fontWeight: 500,
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        User Management
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('bookings')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderBottom: activeTab === 'bookings' ? '2px solid var(--color-primary)' : 'none',
-                            color: activeTab === 'bookings' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                            fontWeight: 500,
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Booking Requests
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('logs')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderBottom: activeTab === 'logs' ? '2px solid var(--color-primary)' : 'none',
-                            color: activeTab === 'logs' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                            fontWeight: 500,
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Booking Logs
-                    </button>
+            <div style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', overflowX: 'auto' }}>
+                <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
+                    {['users', 'bookings', 'orders', 'inventory', 'logs'].map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab as any)}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : 'none',
+                                color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                fontWeight: 500,
+                                background: 'none',
+                                borderTop: 'none',
+                                borderLeft: 'none',
+                                borderRight: 'none',
+                                cursor: 'pointer',
+                                textTransform: 'capitalize'
+                            }}
+                        >
+                            {tab === 'users' ? 'User Management' :
+                                tab === 'bookings' ? 'Booking Requests' :
+                                    tab === 'orders' ? 'Component Orders' :
+                                        tab === 'inventory' ? 'Inventory' : 'Booking Logs'}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -304,6 +321,143 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
                         )}
+                    </Card>
+                )}
+
+                {activeTab === 'orders' && (
+                    <>
+                        <Card title="Pending Component Orders">
+                            {pendingOrders.length === 0 ? (
+                                <p style={{ color: 'var(--color-text-secondary)' }}>No pending component orders.</p>
+                            ) : (
+                                <div className="flex flex-col gap-4">
+                                    {pendingOrders.map(order => (
+                                        <div key={order.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h3 style={{ fontWeight: 600 }}>Order #{order.id.slice(0, 8)}</h3>
+                                                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+                                                        {order.userName} • {new Date(order.date).toLocaleDateString()}
+                                                    </div>
+                                                </div>
+                                                <span style={{
+                                                    fontSize: '0.75rem',
+                                                    padding: '0.25rem 0.5rem',
+                                                    borderRadius: '999px',
+                                                    backgroundColor: '#FEF3C7',
+                                                    color: '#92400E'
+                                                }}>
+                                                    PENDING
+                                                </span>
+                                            </div>
+
+                                            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                                                <strong>Items:</strong>
+                                                <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem', marginTop: '0.25rem' }}>
+                                                    {order.items.map((item, i) => (
+                                                        <li key={i}>{item.componentName} (x{item.quantity})</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+
+                                            <div className="flex gap-2 mt-4">
+                                                <Button onClick={() => handleApproveOrder(order.id)} style={{ fontSize: '0.875rem' }}>Approve</Button>
+                                                <Button variant="secondary" onClick={() => handleRejectOrder(order.id)} style={{ fontSize: '0.875rem', color: 'var(--color-alert)' }}>Reject</Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </Card>
+
+                        <Card title="Order History">
+                            {pastOrders.length === 0 ? (
+                                <p style={{ color: 'var(--color-text-secondary)' }}>No past orders.</p>
+                            ) : (
+                                <div className="flex flex-col gap-4">
+                                    {pastOrders.map(order => (
+                                        <div key={order.id} className="flex justify-between items-center p-2 border-b" style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                                            <div>
+                                                <span style={{ fontWeight: 500 }}>{order.userName}</span>
+                                                <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+                                                    ({order.items.length} items) • {new Date(order.date).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: 'var(--radius-full)',
+                                                backgroundColor: order.status === 'approved' ? '#DEF7EC' : '#FDE8E8',
+                                                color: order.status === 'approved' ? '#03543F' : '#9B1C1C'
+                                            }}>
+                                                {order.status.toUpperCase()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </Card>
+                    </>
+                )}
+
+                {activeTab === 'inventory' && (
+                    <Card title="Inventory Management">
+                        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                            {['all', 'sensor', 'microcontroller', 'actuator', 'other'].map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setInventoryFilter(cat as any)}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '999px',
+                                        border: '1px solid var(--color-border)',
+                                        backgroundColor: inventoryFilter === cat ? 'var(--color-primary)' : 'white',
+                                        color: inventoryFilter === cat ? 'white' : 'var(--color-text-primary)',
+                                        cursor: 'pointer',
+                                        fontSize: '0.875rem',
+                                        textTransform: 'capitalize'
+                                    }}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {filteredComponents.map(component => (
+                                <div key={component.id} style={{
+                                    border: '1px solid var(--color-border)',
+                                    padding: '1rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <div>
+                                        <div className="flex justify-between items-start">
+                                            <h3 style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{component.name}</h3>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                padding: '0.125rem 0.375rem',
+                                                borderRadius: '4px',
+                                                backgroundColor: '#EBF5FF',
+                                                color: '#1E429F',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                {component.category}
+                                            </span>
+                                        </div>
+                                        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{component.description}</p>
+                                        <div className="flex justify-between items-center mt-2" style={{ fontSize: '0.875rem' }}>
+                                            <span><strong>Total:</strong> {component.totalQuantity}</span>
+                                            <span style={{ color: component.availableQuantity === 0 ? 'red' : 'green', fontWeight: 600 }}>
+                                                Available: {component.availableQuantity}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </Card>
                 )}
 

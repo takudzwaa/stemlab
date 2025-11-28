@@ -8,14 +8,18 @@ import { User } from '@/types/user';
 import { Button, Input, Card } from '@/components/UI';
 import { useCart } from '@/context/CartContext';
 
-export default function BookLabPage() {
+export default function NewBookingPage() {
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [formData, setFormData] = useState({
         date: '',
         startTime: '',
         endTime: '',
-        purpose: ''
+        purpose: '',
+        courseCode: '',
+        topic: '',
+        numberOfStudents: 0,
+        requirements: ''
     });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -24,7 +28,7 @@ export default function BookLabPage() {
 
     useEffect(() => {
         const currentUser = AuthService.getCurrentUser();
-        if (!currentUser || currentUser.role !== 'student') {
+        if (!currentUser) {
             router.push('/login');
             return;
         }
@@ -37,7 +41,6 @@ export default function BookLabPage() {
         setIsLoading(true);
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 500));
             await InventoryService.createBooking({
                 userId: user.id,
                 userName: user.name,
@@ -51,8 +54,9 @@ export default function BookLabPage() {
 
             clearCart();
             alert('Booking request submitted successfully!');
-            router.push('/student');
+            router.push('/dashboard/bookings');
         } catch (err) {
+            console.error(err);
             alert('Failed to submit booking');
         } finally {
             setIsLoading(false);
@@ -62,21 +66,40 @@ export default function BookLabPage() {
     if (!user) return null;
 
     return (
-        <main className="container" style={{ padding: '2rem 1rem', display: 'flex', justifyContent: 'center' }}>
-            <Card className="w-full max-w-lg" style={{ width: '100%', maxWidth: '600px' }} title="Book Practical Lab Session">
+        <div>
+            <div className="mb-6">
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>New Booking</h1>
+                <p style={{ color: 'var(--color-text-secondary)' }}>Book a lab session or equipment</p>
+            </div>
+
+            <Card className="w-full max-w-2xl mx-auto" title="Booking Details">
                 <form onSubmit={handleSubmit}>
-                    <Input
-                        label="Date"
-                        type="date"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        required
-                    />
-                    <div className="flex gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <Input
+                            label="Course Code (Optional)"
+                            value={formData.courseCode}
+                            onChange={(e) => setFormData({ ...formData, courseCode: e.target.value })}
+                            placeholder="e.g. CSC401"
+                        />
+                        <Input
+                            label="Topic (Optional)"
+                            value={formData.topic}
+                            onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                            placeholder="e.g. Microcontrollers"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <Input
+                            label="Date"
+                            type="date"
+                            value={formData.date}
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            required
+                        />
                         <Input
                             label="Start Time"
                             type="time"
-                            className="flex-1"
                             value={formData.startTime}
                             onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                             required
@@ -84,19 +107,46 @@ export default function BookLabPage() {
                         <Input
                             label="End Time"
                             type="time"
-                            className="flex-1"
                             value={formData.endTime}
                             onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                             required
                         />
                     </div>
-                    <div className="flex flex-col gap-2" style={{ marginBottom: '1rem' }}>
-                        <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Purpose of Practical</label>
+
+                    <div className="mb-4">
+                        <Input
+                            label="Number of Students (Optional)"
+                            type="number"
+                            value={formData.numberOfStudents}
+                            onChange={(e) => setFormData({ ...formData, numberOfStudents: parseInt(e.target.value) || 0 })}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-2 mb-4">
+                        <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Purpose / Description</label>
                         <textarea
                             value={formData.purpose}
                             onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
                             required
-                            rows={4}
+                            rows={3}
+                            style={{
+                                padding: '0.75rem',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--color-border)',
+                                fontSize: '1rem',
+                                width: '100%',
+                                fontFamily: 'inherit'
+                            }}
+                            placeholder="Describe the purpose of this booking..."
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-2 mb-4">
+                        <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Special Requirements (Optional)</label>
+                        <textarea
+                            value={formData.requirements}
+                            onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
+                            rows={2}
                             style={{
                                 padding: '0.75rem',
                                 borderRadius: 'var(--radius-md)',
@@ -110,7 +160,7 @@ export default function BookLabPage() {
 
                     {/* Show Cart Items attached to booking */}
                     {cart.length > 0 && (
-                        <div style={{ padding: '1rem', backgroundColor: 'var(--color-surface-alt)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+                        <div style={{ padding: '1rem', backgroundColor: 'var(--color-surface-alt)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
                             <h4 style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Components to Reserve:</h4>
                             <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem' }}>
                                 {cart.map(item => (
@@ -122,7 +172,7 @@ export default function BookLabPage() {
                         </div>
                     )}
 
-                    <div className="flex gap-4" style={{ marginTop: '1rem' }}>
+                    <div className="flex gap-4 mt-6">
                         <Button type="button" variant="secondary" onClick={() => router.back()} style={{ flex: 1 }}>
                             Cancel
                         </Button>
@@ -132,6 +182,6 @@ export default function BookLabPage() {
                     </div>
                 </form>
             </Card>
-        </main>
+        </div>
     );
 }

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { InventoryService } from '@/services/inventory';
 import { Component } from '@/types/inventory';
 import { Card, Input, Button } from '@/components/UI';
+import { useCart } from '@/context/CartContext';
 
 export default function ResourcesPage() {
     const searchParams = useSearchParams();
@@ -13,24 +14,29 @@ export default function ResourcesPage() {
     const [components, setComponents] = useState<Component[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
 
+    const { addToCart } = useCart();
+
     useEffect(() => {
-        let allComponents = InventoryService.getComponents();
-        if (categoryFilter) {
-            // Simple mapping for demo purposes, real app might have strict categories
-            if (categoryFilter === 'lab') {
-                // Mocking lab resources if they were separate, for now showing all or specific types
-            } else if (categoryFilter === 'equipment') {
-                allComponents = allComponents.filter(c => c.category === 'actuator' || c.category === 'sensor');
-            } else if (categoryFilter === 'component') {
-                allComponents = allComponents.filter(c => c.category === 'microcontroller');
+        const init = async () => {
+            let allComponents = await InventoryService.getComponents();
+            if (categoryFilter) {
+                // Simple mapping for demo purposes, real app might have strict categories
+                if (categoryFilter === 'lab') {
+                    // Mocking lab resources if they were separate, for now showing all or specific types
+                } else if (categoryFilter === 'equipment') {
+                    allComponents = allComponents.filter(c => c.category === 'actuator' || c.category === 'sensor');
+                } else if (categoryFilter === 'component') {
+                    allComponents = allComponents.filter(c => c.category === 'microcontroller');
+                }
             }
-        }
-        setComponents(allComponents);
+            setComponents(allComponents);
+        };
+        init();
     }, [categoryFilter]);
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(e.target.value);
-        const results = InventoryService.searchComponents(e.target.value);
+        const results = await InventoryService.searchComponents(e.target.value);
         setComponents(results);
     };
 
@@ -86,9 +92,10 @@ export default function ResourcesPage() {
                             <Button
                                 style={{ marginTop: '1rem', width: '100%' }}
                                 variant="secondary"
-                                onClick={() => alert('Add to cart functionality to be linked')}
+                                onClick={() => addToCart(component)}
+                                disabled={component.availableQuantity === 0}
                             >
-                                View Details
+                                {component.availableQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
                             </Button>
                         </div>
                     ))}

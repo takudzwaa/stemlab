@@ -12,19 +12,22 @@ export default function DashboardOverview() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const user = AuthService.getCurrentUser();
-        if (user) {
-            const userStats = InventoryService.getBookingStats(user.id);
-            setStats(userStats);
+        const init = async () => {
+            const user = AuthService.getCurrentUser();
+            if (user) {
+                const userStats = await InventoryService.getBookingStats(user.id);
+                setStats(userStats);
 
-            const allBookings = InventoryService.getBookings();
-            const userBookings = allBookings
-                .filter(b => b.userId === user.id)
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, 5); // Get latest 5
-            setUpcomingBookings(userBookings);
-        }
-        setLoading(false);
+                const allBookings = await InventoryService.getBookings();
+                const userBookings = allBookings
+                    .filter(b => b.userId === user.id)
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .slice(0, 5); // Get latest 5
+                setUpcomingBookings(userBookings);
+            }
+            setLoading(false);
+        };
+        init();
     }, []);
 
     if (loading) return <div>Loading dashboard...</div>;
