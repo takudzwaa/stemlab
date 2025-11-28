@@ -1,10 +1,11 @@
 export interface Component {
     id: string;
     name: string;
-    category: 'sensor' | 'microcontroller' | 'actuator' | 'other';
+    category: 'sensor' | 'microcontroller' | 'actuator' | 'other' | 'Labs' | 'Labs equipment' | 'Projects components';
     totalQuantity: number;
     availableQuantity: number;
     description: string;
+    subcategory?: 'sensor' | 'microcontroller' | 'actuator';
 }
 
 export interface LabBooking {

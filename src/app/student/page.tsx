@@ -16,6 +16,7 @@ export default function StudentDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [components, setComponents] = useState<Component[]>([]);
     const [myOrders, setMyOrders] = useState<ComponentOrder[]>([]);
+    const [activeCategory, setActiveCategory] = useState<'all' | 'Labs' | 'Labs equipment' | 'Projects components'>('all');
 
     // Use global cart context
     const { cart, addToCart, removeFromCart, clearCart } = useCart();
@@ -78,6 +79,27 @@ export default function StudentDashboard() {
                 <div style={{ gridColumn: 'span 2' }}>
                     <Card title="Component Inventory">
                         <div style={{ marginBottom: '1.5rem' }}>
+                            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                                {['all', 'Labs', 'Labs equipment', 'Projects components'].map(cat => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setActiveCategory(cat as any)}
+                                        style={{
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '999px',
+                                            border: '1px solid var(--color-border)',
+                                            backgroundColor: activeCategory === cat ? 'var(--color-primary)' : 'white',
+                                            color: activeCategory === cat ? 'white' : 'var(--color-text-primary)',
+                                            cursor: 'pointer',
+                                            fontSize: '0.875rem',
+                                            textTransform: 'capitalize',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
                             <Input
                                 label="Search Components"
                                 placeholder="Type to search..."
@@ -87,32 +109,55 @@ export default function StudentDashboard() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {components.map(component => (
-                                <div key={component.id} style={{
-                                    border: '1px solid var(--color-border)',
-                                    padding: '1rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between'
-                                }}>
-                                    <div>
-                                        <h3 style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{component.name}</h3>
-                                        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{component.description}</p>
-                                        <div style={{ fontSize: '0.875rem' }}>
-                                            <span style={{ fontWeight: 600 }}>Available:</span> {component.availableQuantity} / {component.totalQuantity}
+                            {components
+                                .filter(c => activeCategory === 'all' ? true : c.category === activeCategory)
+                                .map(component => (
+                                    <div key={component.id} style={{
+                                        border: '1px solid var(--color-border)',
+                                        padding: '1rem',
+                                        borderRadius: 'var(--radius-md)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between'
+                                    }}>
+                                        <div>
+                                            <div className="flex justify-between items-start">
+                                                <h3 style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{component.name}</h3>
+                                                <span style={{
+                                                    fontSize: '0.75rem',
+                                                    padding: '0.125rem 0.375rem',
+                                                    borderRadius: '4px',
+                                                    backgroundColor: '#EBF5FF',
+                                                    color: '#1E429F',
+                                                    textTransform: 'uppercase'
+                                                }}>
+                                                    {component.category === 'Projects components' && component.subcategory ? component.subcategory : component.category}
+                                                </span>
+                                            </div>
+                                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{component.description}</p>
+                                            <div style={{ fontSize: '0.875rem' }}>
+                                                <span style={{ fontWeight: 600 }}>Available:</span> {component.availableQuantity} / {component.totalQuantity}
+                                            </div>
                                         </div>
+                                        {component.category === 'Labs' ? (
+                                            <Button
+                                                onClick={() => router.push('/student/book-lab')}
+                                                style={{ marginTop: '1rem', width: '100%' }}
+                                            >
+                                                Book Now
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                onClick={() => addToCart(component)}
+                                                disabled={component.availableQuantity === 0}
+                                                style={{ marginTop: '1rem', width: '100%' }}
+                                                variant="secondary"
+                                            >
+                                                {component.availableQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                                            </Button>
+                                        )}
                                     </div>
-                                    <Button
-                                        onClick={() => addToCart(component)}
-                                        disabled={component.availableQuantity === 0}
-                                        style={{ marginTop: '1rem', width: '100%' }}
-                                        variant="secondary"
-                                    >
-                                        {component.availableQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
-                                    </Button>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     </Card>
                 </div>

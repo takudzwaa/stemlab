@@ -27,7 +27,8 @@ export default function AdminDashboard() {
         category: 'other' as Component['category'],
         totalQuantity: 0,
         availableQuantity: 0,
-        description: ''
+        description: '',
+        subcategory: undefined as Component['subcategory']
     });
 
     const [editUserForm, setEditUserForm] = useState({
@@ -37,7 +38,7 @@ export default function AdminDashboard() {
     });
 
     // Inventory Filter State
-    const [inventoryFilter, setInventoryFilter] = useState<'all' | 'sensor' | 'microcontroller' | 'actuator' | 'other'>('all');
+    const [inventoryFilter, setInventoryFilter] = useState<'all' | 'sensor' | 'microcontroller' | 'actuator' | 'Labs' | 'Labs equipment' | 'Projects components' | 'other'>('all');
 
     useEffect(() => {
         const user = AuthService.getCurrentUser();
@@ -72,9 +73,74 @@ export default function AdminDashboard() {
             availableQuantity: resourceForm.totalQuantity // Default available to total
         });
         setShowAddResource(false);
-        setResourceForm({ name: '', category: 'other', totalQuantity: 0, availableQuantity: 0, description: '' });
+        setResourceForm({ name: '', category: 'other', totalQuantity: 0, availableQuantity: 0, description: '', subcategory: undefined });
         alert('Resource added successfully');
         loadData();
+    };
+
+    const seedDatabase = async () => {
+        if (!confirm('This will add initial data to the database. Continue?')) return;
+
+        const labs = [
+            'Stem Lab 1', 'Stem Lab 2', 'Staff Lab', 'Boardroom',
+            'GIS Lab', 'Computer Engineering Lab', 'Mechatronics Lab'
+        ];
+
+        const equipment = [
+            'Proskit Multimeters', 'Screwdrivers Toolset', 'Lab Helping Hand',
+            'Hot Air Gun', 'Projectors'
+        ];
+
+        const projectComponents = [
+            { name: 'Arduino Uno', sub: 'microcontroller' },
+            { name: 'ESP32', sub: 'microcontroller' },
+            { name: 'Ultrasonic Sensor', sub: 'sensor' },
+            { name: 'DHT11 Temperature Sensor', sub: 'sensor' },
+            { name: 'Servo Motor', sub: 'actuator' },
+            { name: 'DC Motor', sub: 'actuator' }
+        ];
+
+        try {
+            // Seed Labs
+            for (const lab of labs) {
+                await InventoryService.addComponent({
+                    name: lab,
+                    category: 'Labs',
+                    totalQuantity: 1,
+                    availableQuantity: 1,
+                    description: 'Laboratory Space'
+                });
+            }
+
+            // Seed Equipment
+            for (const item of equipment) {
+                await InventoryService.addComponent({
+                    name: item,
+                    category: 'Labs equipment',
+                    totalQuantity: 5,
+                    availableQuantity: 5,
+                    description: 'Lab Equipment'
+                });
+            }
+
+            // Seed Project Components
+            for (const item of projectComponents) {
+                await InventoryService.addComponent({
+                    name: item.name,
+                    category: 'Projects components',
+                    subcategory: item.sub as any,
+                    totalQuantity: 10,
+                    availableQuantity: 10,
+                    description: `Standard ${item.sub}`
+                });
+            }
+
+            alert('Database seeded successfully!');
+            loadData();
+        } catch (error) {
+            console.error('Error seeding database:', error);
+            alert('Failed to seed database.');
+        }
     };
 
     const startEditUser = (user: User) => {
@@ -92,12 +158,18 @@ export default function AdminDashboard() {
     };
 
     const handleApproveBooking = async (bookingId: string) => {
-        const success = await InventoryService.approveBooking(bookingId);
-        if (success) {
+        const result = await InventoryService.approveBooking(bookingId);
+        if (result.success) {
             alert('Booking approved successfully');
             loadData();
         } else {
-            alert('Failed to approve booking. Check inventory availability.');
+            let message = 'Failed to approve booking.';
+            if (result.missingItems && result.missingItems.length > 0) {
+                message += '\n\nMissing Items:\n' + result.missingItems.map(i => `- ${i}`).join('\n');
+            } else if (result.error) {
+                message += ` ${result.error}`;
+            }
+            alert(message);
         }
     };
 
@@ -110,12 +182,18 @@ export default function AdminDashboard() {
     };
 
     const handleApproveOrder = async (orderId: string) => {
-        const success = await InventoryService.updateOrderStatus(orderId, 'approved');
-        if (success) {
+        const result = await InventoryService.updateOrderStatus(orderId, 'approved');
+        if (result.success) {
             alert('Order approved successfully');
             loadData();
         } else {
-            alert('Failed to approve order. Check inventory availability.');
+            let message = 'Failed to approve order.';
+            if (result.missingItems && result.missingItems.length > 0) {
+                message += '\n\nMissing Items:\n' + result.missingItems.map(i => `- ${i}`).join('\n');
+            } else if (result.error) {
+                message += ` ${result.error}`;
+            }
+            alert(message);
         }
     };
 
@@ -143,7 +221,10 @@ export default function AdminDashboard() {
         <main className="container" style={{ padding: '2rem 1rem' }}>
             <div className="flex justify-between items-center mb-4" style={{ marginBottom: '2rem' }}>
                 <h1 style={{ color: 'var(--color-primary)' }}>Admin Dashboard</h1>
-                <Button onClick={() => setShowAddResource(true)}>Add New Resource</Button>
+                <div className="flex gap-2">
+                    <Button onClick={seedDatabase} variant="secondary">Seed Database</Button>
+                    <Button onClick={() => setShowAddResource(true)}>Add New Resource</Button>
+                </div>
             </div>
 
             <div style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', overflowX: 'auto' }}>
@@ -190,9 +271,27 @@ export default function AdminDashboard() {
                                     <option value="sensor">Sensor</option>
                                     <option value="microcontroller">Microcontroller</option>
                                     <option value="actuator">Actuator</option>
+                                    <option value="Labs">Labs</option>
+                                    <option value="Labs equipment">Labs equipment</option>
+                                    <option value="Projects components">Projects components</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
+
+                            {resourceForm.category === 'Projects components' && (
+                                <div className="flex flex-col gap-2" style={{ marginBottom: '1rem' }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Subcategory</label>
+                                    <select
+                                        value={resourceForm.subcategory || 'sensor'}
+                                        onChange={e => setResourceForm({ ...resourceForm, subcategory: e.target.value as any })}
+                                        style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', width: '100%' }}
+                                    >
+                                        <option value="sensor">Sensor</option>
+                                        <option value="microcontroller">Microcontroller</option>
+                                        <option value="actuator">Actuator</option>
+                                    </select>
+                                </div>
+                            )}
                             <Input label="Quantity" type="number" value={resourceForm.totalQuantity} onChange={e => setResourceForm({ ...resourceForm, totalQuantity: parseInt(e.target.value) })} required />
                             <Input label="Description" value={resourceForm.description} onChange={e => setResourceForm({ ...resourceForm, description: e.target.value })} required />
                             <div className="flex gap-4">
@@ -403,7 +502,7 @@ export default function AdminDashboard() {
                 {activeTab === 'inventory' && (
                     <Card title="Inventory Management">
                         <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                            {['all', 'sensor', 'microcontroller', 'actuator', 'other'].map(cat => (
+                            {['all', 'sensor', 'microcontroller', 'actuator', 'Labs', 'Labs equipment', 'Projects components', 'other'].map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setInventoryFilter(cat as any)}
@@ -445,6 +544,7 @@ export default function AdminDashboard() {
                                                 textTransform: 'uppercase'
                                             }}>
                                                 {component.category}
+                                                {component.subcategory && ` - ${component.subcategory}`}
                                             </span>
                                         </div>
                                         <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{component.description}</p>

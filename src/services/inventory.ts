@@ -20,6 +20,12 @@ export interface ComponentOrder {
     date: string;
 }
 
+export interface InventoryOperationResult {
+    success: boolean;
+    error?: string;
+    missingItems?: string[];
+}
+
 export const InventoryService = {
     getComponents: async (): Promise<Component[]> => {
         try {
@@ -118,7 +124,7 @@ export const InventoryService = {
         }
     },
 
-    approveBooking: async (bookingId: string): Promise<boolean> => {
+    approveBooking: async (bookingId: string): Promise<InventoryOperationResult> => {
         try {
             await runTransaction(db, async (transaction) => {
                 const bookingRef = doc(db, 'bookings', bookingId);
@@ -131,32 +137,56 @@ export const InventoryService = {
                 const booking = bookingDoc.data() as LabBooking;
 
                 if (booking.components && booking.components.length > 0) {
-                    // Check availability and deduct
+                    const missingItems: string[] = [];
+                    const componentUpdates: { ref: any, newQuantity: number }[] = [];
+
+                    // Check all items first
                     for (const item of booking.components) {
                         const componentRef = doc(db, 'components', item.componentId);
                         const componentDoc = await transaction.get(componentRef);
 
                         if (!componentDoc.exists()) {
-                            throw new Error(`Component ${item.componentId} not found`);
+                            missingItems.push(`${item.componentName} (Not Found)`);
+                            continue;
                         }
 
                         const component = componentDoc.data() as Component;
                         if (component.availableQuantity < item.quantity) {
-                            throw new Error(`Insufficient quantity for ${component.name}`);
+                            missingItems.push(`${component.name} (Requested: ${item.quantity}, Available: ${component.availableQuantity})`);
+                        } else {
+                            componentUpdates.push({
+                                ref: componentRef,
+                                newQuantity: component.availableQuantity - item.quantity
+                            });
                         }
+                    }
 
-                        transaction.update(componentRef, {
-                            availableQuantity: component.availableQuantity - item.quantity
+                    if (missingItems.length > 0) {
+                        throw new Error(JSON.stringify({ type: 'STOCK_SHORTAGE', items: missingItems }));
+                    }
+
+                    // Apply updates if no missing items
+                    for (const update of componentUpdates) {
+                        transaction.update(update.ref, {
+                            availableQuantity: update.newQuantity
                         });
                     }
                 }
 
                 transaction.update(bookingRef, { status: 'approved' });
             });
-            return true;
-        } catch (error) {
+            return { success: true };
+        } catch (error: any) {
             console.error("Transaction failed: ", error);
-            return false;
+            try {
+                const parsedError = JSON.parse(error.message);
+                if (parsedError.type === 'STOCK_SHORTAGE') {
+                    return { success: false, error: 'Stock shortage', missingItems: parsedError.items };
+                }
+            } catch (e) {
+                // Not a JSON error
+            }
+            return { success: false, error: error.message || "Unknown error" };
         }
     },
 
@@ -171,7 +201,7 @@ export const InventoryService = {
         }
     },
 
-    updateOrderStatus: async (orderId: string, status: 'approved' | 'rejected'): Promise<boolean> => {
+    updateOrderStatus: async (orderId: string, status: 'approved' | 'rejected'): Promise<InventoryOperationResult> => {
         try {
             await runTransaction(db, async (transaction) => {
                 const orderRef = doc(db, 'orders', orderId);
@@ -184,32 +214,56 @@ export const InventoryService = {
                 const order = orderDoc.data() as ComponentOrder;
 
                 if (status === 'approved' && order.status !== 'approved') {
-                    // Deduct inventory
+                    const missingItems: string[] = [];
+                    const componentUpdates: { ref: any, newQuantity: number }[] = [];
+
+                    // Check all items first
                     for (const item of order.items) {
                         const componentRef = doc(db, 'components', item.componentId);
                         const componentDoc = await transaction.get(componentRef);
 
                         if (!componentDoc.exists()) {
-                            throw new Error(`Component ${item.componentId} not found`);
+                            missingItems.push(`${item.componentName} (Not Found)`);
+                            continue;
                         }
 
                         const component = componentDoc.data() as Component;
                         if (component.availableQuantity < item.quantity) {
-                            throw new Error(`Insufficient quantity for ${component.name}`);
+                            missingItems.push(`${component.name} (Requested: ${item.quantity}, Available: ${component.availableQuantity})`);
+                        } else {
+                            componentUpdates.push({
+                                ref: componentRef,
+                                newQuantity: component.availableQuantity - item.quantity
+                            });
                         }
+                    }
 
-                        transaction.update(componentRef, {
-                            availableQuantity: component.availableQuantity - item.quantity
+                    if (missingItems.length > 0) {
+                        throw new Error(JSON.stringify({ type: 'STOCK_SHORTAGE', items: missingItems }));
+                    }
+
+                    // Apply updates
+                    for (const update of componentUpdates) {
+                        transaction.update(update.ref, {
+                            availableQuantity: update.newQuantity
                         });
                     }
                 }
 
                 transaction.update(orderRef, { status });
             });
-            return true;
-        } catch (error) {
+            return { success: true };
+        } catch (error: any) {
             console.error("Error updating order status:", error);
-            return false;
+            try {
+                const parsedError = JSON.parse(error.message);
+                if (parsedError.type === 'STOCK_SHORTAGE') {
+                    return { success: false, error: 'Stock shortage', missingItems: parsedError.items };
+                }
+            } catch (e) {
+                // Not a JSON error
+            }
+            return { success: false, error: error.message || "Unknown error" };
         }
     }
 };
