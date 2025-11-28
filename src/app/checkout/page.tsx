@@ -4,23 +4,57 @@ import React, { useState } from 'react';
 import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { AuthService } from '@/services/auth';
+import { InventoryService } from '@/services/inventory';
 
 export default function CheckoutPage() {
     const { cart, getCartTotal, clearCart } = useCart();
     const router = useRouter();
+    const [user, setUser] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    React.useEffect(() => {
+        const currentUser = AuthService.getCurrentUser();
+        if (currentUser) {
+            setUser(currentUser);
+        }
+    }, []);
+
     const handlePlaceOrder = async () => {
+        if (!user) {
+            alert('Please log in to place an order.');
+            router.push('/login');
+            return;
+        }
+
         setIsSubmitting(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // TODO: Integrate with backend to save order
+        try {
+            await InventoryService.createOrder({
+                userId: user.id,
+                userName: user.name,
+                items: cart.map(item => ({
+                    componentId: item.component.id,
+                    componentName: item.component.name,
+                    quantity: item.quantity
+                }))
+            });
 
-        clearCart();
-        alert('Order placed successfully!');
-        router.push('/student'); // Redirect to dashboard
-        setIsSubmitting(false);
+            clearCart();
+            alert('Order placed successfully!');
+
+            // Redirect based on role
+            if (user.role === 'student') {
+                router.push('/student');
+            } else {
+                router.push('/admin'); // Or wherever staff should go
+            }
+        } catch (error) {
+            console.error('Error placing order:', error);
+            alert('Failed to place order. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (cart.length === 0) {

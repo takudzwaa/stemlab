@@ -271,4 +271,15 @@ export const InventoryService = {
             return { success: false, error: error.message || "Unknown error" };
         }
     }
+    ,
+
+    updateComponent: async (componentId: string, updates: Partial<Component>): Promise<void> => {
+        try {
+            const componentRef = doc(db, 'components', componentId);
+            await updateDoc(componentRef, removeUndefined(updates));
+        } catch (error) {
+            console.error("Error updating component:", error);
+            throw error;
+        }
+    }
 };

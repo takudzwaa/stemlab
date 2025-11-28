@@ -40,6 +40,17 @@ export default function AdminDashboard() {
     // Inventory Filter State
     const [inventoryFilter, setInventoryFilter] = useState<'all' | 'sensor' | 'microcontroller' | 'actuator' | 'Labs' | 'Labs equipment' | 'Projects components' | 'other'>('all');
 
+    // Edit Resource State
+    const [editingComponent, setEditingComponent] = useState<Component | null>(null);
+    const [editResourceForm, setEditResourceForm] = useState({
+        name: '',
+        category: 'other' as Component['category'],
+        totalQuantity: 0,
+        availableQuantity: 0,
+        description: '',
+        subcategory: undefined as Component['subcategory']
+    });
+
     useEffect(() => {
         const user = AuthService.getCurrentUser();
         if (!user || user.role !== 'admin') {
@@ -155,6 +166,28 @@ export default function AdminDashboard() {
         setEditingUser(null);
         loadData();
         alert('User updated successfully');
+    };
+
+    const startEditResource = (component: Component) => {
+        setEditingComponent(component);
+        setEditResourceForm({
+            name: component.name,
+            category: component.category,
+            totalQuantity: component.totalQuantity,
+            availableQuantity: component.availableQuantity,
+            description: component.description,
+            subcategory: component.subcategory
+        });
+    };
+
+    const handleUpdateResource = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingComponent) return;
+
+        await InventoryService.updateComponent(editingComponent.id, editResourceForm);
+        setEditingComponent(null);
+        loadData();
+        alert('Resource updated successfully');
     };
 
     const handleApproveBooking = async (bookingId: string) => {
@@ -323,6 +356,53 @@ export default function AdminDashboard() {
                             <div className="flex gap-4">
                                 <Button type="button" variant="secondary" onClick={() => setEditingUser(null)}>Cancel</Button>
                                 <Button type="submit">Update User</Button>
+                            </div>
+                        </form>
+                    </Card>
+                )}
+
+                {/* Edit Resource Modal */}
+                {editingComponent && (
+                    <Card title={`Edit Resource: ${editingComponent.name}`} style={{ border: '2px solid var(--color-primary)' }}>
+                        <form onSubmit={handleUpdateResource}>
+                            <Input label="Name" value={editResourceForm.name} onChange={e => setEditResourceForm({ ...editResourceForm, name: e.target.value })} required />
+                            <div className="flex flex-col gap-2" style={{ marginBottom: '1rem' }}>
+                                <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Category</label>
+                                <select
+                                    value={editResourceForm.category}
+                                    onChange={e => setEditResourceForm({ ...editResourceForm, category: e.target.value as any })}
+                                    style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', width: '100%' }}
+                                >
+                                    <option value="sensor">Sensor</option>
+                                    <option value="microcontroller">Microcontroller</option>
+                                    <option value="actuator">Actuator</option>
+                                    <option value="Labs">Labs</option>
+                                    <option value="Labs equipment">Labs equipment</option>
+                                    <option value="Projects components">Projects components</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            {editResourceForm.category === 'Projects components' && (
+                                <div className="flex flex-col gap-2" style={{ marginBottom: '1rem' }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Subcategory</label>
+                                    <select
+                                        value={editResourceForm.subcategory || 'sensor'}
+                                        onChange={e => setEditResourceForm({ ...editResourceForm, subcategory: e.target.value as any })}
+                                        style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', width: '100%' }}
+                                    >
+                                        <option value="sensor">Sensor</option>
+                                        <option value="microcontroller">Microcontroller</option>
+                                        <option value="actuator">Actuator</option>
+                                    </select>
+                                </div>
+                            )}
+                            <Input label="Total Quantity" type="number" value={editResourceForm.totalQuantity} onChange={e => setEditResourceForm({ ...editResourceForm, totalQuantity: parseInt(e.target.value) })} required />
+                            <Input label="Available Quantity" type="number" value={editResourceForm.availableQuantity} onChange={e => setEditResourceForm({ ...editResourceForm, availableQuantity: parseInt(e.target.value) })} required />
+                            <Input label="Description" value={editResourceForm.description} onChange={e => setEditResourceForm({ ...editResourceForm, description: e.target.value })} required />
+                            <div className="flex gap-4">
+                                <Button type="button" variant="secondary" onClick={() => setEditingComponent(null)}>Cancel</Button>
+                                <Button type="submit">Update Resource</Button>
                             </div>
                         </form>
                     </Card>
@@ -554,6 +634,13 @@ export default function AdminDashboard() {
                                                 Available: {component.availableQuantity}
                                             </span>
                                         </div>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => startEditResource(component)}
+                                            style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.875rem' }}
+                                        >
+                                            Edit
+                                        </Button>
                                     </div>
                                 </div>
                             ))}

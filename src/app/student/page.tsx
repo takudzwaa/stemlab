@@ -18,6 +18,8 @@ export default function StudentDashboard() {
     const [myOrders, setMyOrders] = useState<ComponentOrder[]>([]);
     const [activeCategory, setActiveCategory] = useState<'all' | 'Labs' | 'Labs equipment' | 'Projects components'>('all');
 
+    const [myBookings, setMyBookings] = useState<any[]>([]);
+
     // Use global cart context
     const { cart, addToCart, removeFromCart, clearCart } = useCart();
 
@@ -31,14 +33,17 @@ export default function StudentDashboard() {
             setUser(currentUser);
             const comps = await InventoryService.getComponents();
             setComponents(comps);
-            await loadOrders(currentUser.id);
+            await loadUserActivity(currentUser.id);
         };
         init();
     }, []);
 
-    const loadOrders = async (userId: string) => {
+    const loadUserActivity = async (userId: string) => {
         const allOrders = await InventoryService.getOrders();
         setMyOrders(allOrders.filter(o => o.userId === userId));
+
+        const allBookings = await InventoryService.getBookings();
+        setMyBookings(allBookings.filter(b => b.userId === userId));
     };
 
     const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,7 +66,7 @@ export default function StudentDashboard() {
         });
 
         clearCart();
-        await loadOrders(user.id);
+        await loadUserActivity(user.id);
         alert('Order submitted successfully!');
     };
 
@@ -200,6 +205,34 @@ export default function StudentDashboard() {
                         )}
                     </Card>
 
+                    <Card title="My Bookings">
+                        {myBookings.length === 0 ? (
+                            <p style={{ color: 'var(--color-text-secondary)' }}>No lab bookings.</p>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {myBookings.map(booking => (
+                                    <div key={booking.id} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{booking.purpose || 'Lab Session'}</span>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                padding: '0.125rem 0.375rem',
+                                                borderRadius: '999px',
+                                                backgroundColor: booking.status === 'pending' ? '#FEF3C7' : booking.status === 'approved' ? '#D1FAE5' : '#FEE2E2',
+                                                color: booking.status === 'pending' ? '#92400E' : booking.status === 'approved' ? '#065F46' : '#991B1B'
+                                            }}>
+                                                {booking.status.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+                                            {booking.date} • {booking.startTime} - {booking.endTime}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+
                     <Card title="My Orders">
                         {myOrders.length === 0 ? (
                             <p style={{ color: 'var(--color-text-secondary)' }}>No past orders.</p>
@@ -208,7 +241,7 @@ export default function StudentDashboard() {
                                 {myOrders.map(order => (
                                     <div key={order.id} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
                                         <div className="flex justify-between items-center mb-2">
-                                            <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Order #{order.id}</span>
+                                            <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Order #{order.id.slice(0, 8)}</span>
                                             <span style={{
                                                 fontSize: '0.75rem',
                                                 padding: '0.125rem 0.375rem',
