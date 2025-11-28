@@ -10,6 +10,8 @@ import {
     where,
     runTransaction
 } from 'firebase/firestore';
+import { removeUndefined } from '@/lib/utils';
+
 
 export interface ComponentOrder {
     id: string;
@@ -63,7 +65,8 @@ export const InventoryService = {
                 ...booking,
                 status: 'pending'
             };
-            const docRef = await addDoc(collection(db, 'bookings'), newBookingData);
+            const docRef = await addDoc(collection(db, 'bookings'), removeUndefined(newBookingData));
+
             return { id: docRef.id, ...newBookingData } as LabBooking;
         } catch (error) {
             console.error("Error creating booking:", error);
@@ -73,8 +76,9 @@ export const InventoryService = {
 
     addComponent: async (component: Omit<Component, 'id'>): Promise<Component> => {
         try {
-            const docRef = await addDoc(collection(db, 'components'), component);
+            const docRef = await addDoc(collection(db, 'components'), removeUndefined(component));
             return { id: docRef.id, ...component } as Component;
+
         } catch (error) {
             console.error("Error adding component:", error);
             throw error;
@@ -98,7 +102,8 @@ export const InventoryService = {
                 status: 'pending',
                 date: new Date().toISOString()
             };
-            const docRef = await addDoc(collection(db, 'orders'), newOrderData);
+            const docRef = await addDoc(collection(db, 'orders'), removeUndefined(newOrderData));
+
             return { id: docRef.id, ...newOrderData } as ComponentOrder;
         } catch (error) {
             console.error("Error creating order:", error);

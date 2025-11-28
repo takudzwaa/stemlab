@@ -7,4 +7,6 @@ export interface User {
     role: UserRole;
     password?: string; // Optional for display purposes, required for auth
     isApproved: boolean;
+    studentId?: string;
+    staffId?: string;
 }

@@ -1,5 +1,7 @@
 import { User, UserRole } from '@/types/user';
 import { auth, db } from '@/lib/firebase';
+import { removeUndefined } from '@/lib/utils';
+
 import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
@@ -45,7 +47,8 @@ export const AuthService = {
             };
 
             // Store additional user details in Firestore
-            await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+            await setDoc(doc(db, 'users', firebaseUser.uid), removeUndefined(newUser));
+
 
             return newUser;
         } catch (error) {
@@ -111,7 +114,8 @@ export const AuthService = {
     updateUser: async (userId: string, updates: Partial<User>) => {
         try {
             const userRef = doc(db, 'users', userId);
-            await updateDoc(userRef, updates);
+            await updateDoc(userRef, removeUndefined(updates));
+
         } catch (error) {
             console.error("Error updating user:", error);
         }

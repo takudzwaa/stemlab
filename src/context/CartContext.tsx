@@ -14,28 +14,36 @@ interface CartContextType {
     removeFromCart: (componentId: string) => void;
     clearCart: () => void;
     getCartTotal: () => number;
+    isCartOpen: boolean;
+    openCart: () => void;
+    closeCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cart, setCart] = useState<CartItem[]>([]);
+    const [isCartOpen, setIsCartOpen] = useState(false);
 
     // Load cart from localStorage on mount
     useEffect(() => {
-        const storedCart = localStorage.getItem('stemlab_cart');
-        if (storedCart) {
-            try {
-                setCart(JSON.parse(storedCart));
-            } catch (e) {
-                console.error('Failed to parse cart from local storage');
+        if (typeof window !== 'undefined') {
+            const storedCart = localStorage.getItem('stemlab_cart');
+            if (storedCart) {
+                try {
+                    setCart(JSON.parse(storedCart));
+                } catch (e) {
+                    console.error('Failed to parse cart from local storage');
+                }
             }
         }
     }, []);
 
     // Save cart to localStorage whenever it changes
     useEffect(() => {
-        localStorage.setItem('stemlab_cart', JSON.stringify(cart));
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('stemlab_cart', JSON.stringify(cart));
+        }
     }, [cart]);
 
     const addToCart = (component: Component) => {
@@ -56,6 +64,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 return [...prevCart, { component, quantity: 1 }];
             }
         });
+        setIsCartOpen(true);
     };
 
     const removeFromCart = (componentId: string) => {
@@ -70,8 +79,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return cart.reduce((total, item) => total + item.quantity, 0);
     };
 
+    const openCart = () => setIsCartOpen(true);
+    const closeCart = () => setIsCartOpen(false);
+
     return (
-        <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, getCartTotal }}>
+        <CartContext.Provider value={{
+            cart,
+            addToCart,
+            removeFromCart,
+            clearCart,
+            getCartTotal,
+            isCartOpen,
+            openCart,
+            closeCart
+        }}>
             {children}
         </CartContext.Provider>
     );

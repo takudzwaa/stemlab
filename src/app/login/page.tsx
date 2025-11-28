@@ -118,8 +118,8 @@ export default function LoginPage() {
 
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <Input
-                            label={activeTab === 'student' ? "Email or Student ID" : "Email or Staff ID"}
-                            placeholder={activeTab === 'student' ? "name@example.com or student ID" : "name@example.com or staff ID"}
+                            label="Email"
+                            placeholder={activeTab === 'student' ? "student@cut.ac.zw" : "staff@cut.ac.zw"}
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
@@ -156,7 +156,7 @@ export default function LoginPage() {
                             gap: '0.5rem'
                         }}>
                             <span>ℹ️</span>
-                            You can log in using either your email address or your {activeTab} ID.
+                            Please log in using your registered email address.
                         </div>
 
                         <Button type="submit" style={{ width: '100%', padding: '0.75rem' }}>Login</Button>

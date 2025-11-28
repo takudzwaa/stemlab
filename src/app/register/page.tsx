@@ -13,7 +13,9 @@ export default function RegisterPage() {
         name: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        studentId: '',
+        staffId: ''
     });
 
     const handleRegister = async (e: React.FormEvent) => {
@@ -30,7 +32,9 @@ export default function RegisterPage() {
                 name: formData.name,
                 email: formData.email,
                 password: formData.password,
-                role: role
+                role: role,
+                studentId: activeTab === 'student' ? formData.studentId : undefined,
+                staffId: activeTab === 'staff' ? formData.staffId : undefined
             });
 
             alert('Registration successful! Please wait for admin approval.');
@@ -136,6 +140,8 @@ export default function RegisterPage() {
                             <Input
                                 label="Student ID"
                                 placeholder="Your student ID"
+                                value={formData.studentId}
+                                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
                                 required
                             />
                         )}
@@ -143,6 +149,15 @@ export default function RegisterPage() {
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '-0.5rem' }}>
                                 This ID will be used for login and cannot be changed later
                             </p>
+                        )}
+                        {activeTab === 'staff' && (
+                            <Input
+                                label="Staff ID"
+                                placeholder="Your staff ID"
+                                value={formData.staffId}
+                                onChange={(e) => setFormData({ ...formData, staffId: e.target.value })}
+                                required
+                            />
                         )}
 
                         <Input

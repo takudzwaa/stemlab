@@ -110,7 +110,22 @@ export default function StudentDashboard() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {components
-                                .filter(c => activeCategory === 'all' ? true : c.category === activeCategory)
+                                .filter(c => {
+                                    if (activeCategory === 'all') return true;
+                                    // Direct category match
+                                    if (c.category === activeCategory) return true;
+                                    // For 'Projects components' filter, also show items with matching subcategory
+                                    if (activeCategory === 'Projects components') {
+                                        return c.category === 'Projects components' ||
+                                            c.subcategory === 'sensor' ||
+                                            c.subcategory === 'microcontroller' ||
+                                            c.subcategory === 'actuator' ||
+                                            c.category === 'sensor' ||
+                                            c.category === 'microcontroller' ||
+                                            c.category === 'actuator';
+                                    }
+                                    return false;
+                                })
                                 .map(component => (
                                     <div key={component.id} style={{
                                         border: '1px solid var(--color-border)',
